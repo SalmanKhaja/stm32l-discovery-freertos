@@ -20,283 +20,205 @@
   */ 
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32f4xx.h"
-
+#include "stm32l1xx.h"
+/* Includes ------------------------------------------------------------------*/
+#include "discover_board.h"
+#include "stm32l_discovery_lcd.h"
+#include <stdio.h>
 
 /* FreeRTOS includes */
 #include "FreeRTOS.h"
 #include "task.h"
-#include "semphr.h"
+//#include "semphr.h"
 
-#include "hw_config.h"
-
-/** @addtogroup STM32F4-Discovery_Demo
-  * @{
-  */
-
-/* Private typedef -----------------------------------------------------------*/
-/* Private define ------------------------------------------------------------*/
-#define DELAY 125     /* msec */
-#define queueSIZE	6
-
-/* Private macro -------------------------------------------------------------*/
-
-/* Private functions ---------------------------------------------------------*/
-
-/* Task functions declarations */
-static void vLEDTask( void *pvParameters );
-static void vSWITCHTask( void *pvParameters );
-static void vMEMSTask(void *pvParameters);
-static void vBALANCETask(void *pvParameters);
-
-/* handlers to tasks to better control them */
-xTaskHandle xLED_Tasks[4];
-xTaskHandle xMEMS_Task, xBALANCE_Task;
-
-/* variables used by tasks */
-volatile int32_t ITM_RxBuffer;
-/* initial arguments for vLEDTask task (which LED and what is the delay) */
-static const int LEDS[4][2] = {{LED3,DELAY*1},
-							   {LED4,DELAY*2},
-							   {LED5,DELAY*3},
-							   {LED6,DELAY*4}};
-
-/* semaphores, queues declarations */
-xSemaphoreHandle xSemaphoreSW  = NULL;
-xQueueHandle xQueue;
+uint8_t state_machine;
+static volatile uint32_t TimingDelay;
 
 /**
-  * @brief  Main program.
+  * @brief  Decrements the TimingDelay variable.
+  * @caller SysTick interrupt Handler
   * @param  None
   * @retval None
   */
-int main(void)
-{ 
-	/* create a pipe for MEMS->TIM4 data exchange */
-	xQueue=xQueueCreate(1,queueSIZE*sizeof(uint8_t));
+void TimingDelay_Decrement(void)
+{
+  if (TimingDelay != 0x00)
+    TimingDelay--;
+}
+void Delay(__IO uint32_t nTime);
 
-	/* create semaphores... */
-	vSemaphoreCreateBinary( xSemaphoreSW );
+void vTaskLED1(void *pvParameters) {
 
-	/* ...and clean them up */
-	if(xSemaphoreTake(xSemaphoreSW, ( portTickType ) 0) == pdTRUE);
+        for (;;) {
+                GPIO_SetBits(GPIOB, GPIO_Pin_3);
+                vTaskDelay(500);
+                GPIO_ResetBits(GPIOB, GPIO_Pin_3);
+                vTaskDelay(500);
+        }
 
-	/* initialize hardware... */
-	prvSetupHardware();
+}
 
-	/* Start the tasks defined within this file/specific to this demo. */
-	xTaskCreate( vLEDTask, ( signed portCHAR * ) "LED3", configMINIMAL_STACK_SIZE, (void *)LEDS[0],tskIDLE_PRIORITY, &xLED_Tasks[0] );
-	xTaskCreate( vLEDTask, ( signed portCHAR * ) "LED4", configMINIMAL_STACK_SIZE, (void *)LEDS[1],tskIDLE_PRIORITY, &xLED_Tasks[1] );
-	xTaskCreate( vLEDTask, ( signed portCHAR * ) "LED5", configMINIMAL_STACK_SIZE, (void *)LEDS[2],tskIDLE_PRIORITY, &xLED_Tasks[2] );
-	xTaskCreate( vLEDTask, ( signed portCHAR * ) "LED6", configMINIMAL_STACK_SIZE, (void *)LEDS[3],tskIDLE_PRIORITY, &xLED_Tasks[3] );
-	xTaskCreate( vSWITCHTask, ( signed portCHAR * ) "SWITCH", configMINIMAL_STACK_SIZE, NULL,tskIDLE_PRIORITY, NULL );
-	xTaskCreate( vMEMSTask, ( signed portCHAR * ) "MEMS", configMINIMAL_STACK_SIZE, NULL,tskIDLE_PRIORITY, &xMEMS_Task );
-	xTaskCreate( vBALANCETask, ( signed portCHAR * ) "BALANCE", configMINIMAL_STACK_SIZE, NULL,tskIDLE_PRIORITY, &xBALANCE_Task );
+void vTaskLED2(void *pvParameters) {
+
+        for (;;) {
+                GPIO_SetBits(GPIOB, GPIO_Pin_4);
+                vTaskDelay(321);
+                GPIO_ResetBits(GPIOB, GPIO_Pin_4);
+                vTaskDelay(321);
+        }
+
+}
+
+/**
+  * @brief  To initialize the I/O ports
+  * @caller main
+  * @param None
+  * @retval None
+  */
+void  Init_GPIOs (void)
+{
+  /* GPIO, EXTI and NVIC Init structure declaration */
+  GPIO_InitTypeDef GPIO_InitStructure;
+  EXTI_InitTypeDef EXTI_InitStructure;
+  NVIC_InitTypeDef NVIC_InitStructure;
+
+  /* Configure User Button pin as input */
+  GPIO_InitStructure.GPIO_Pin = USERBUTTON_GPIO_PIN;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
+  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_40MHz;
+  GPIO_Init(USERBUTTON_GPIO_PORT, &GPIO_InitStructure);
+
+  /* Select User Button pin as input source for EXTI Line */
+  SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOA,EXTI_PinSource0);
+
+  /* Configure EXT1 Line 0 in interrupt mode trigged on Rising edge */
+  EXTI_InitStructure.EXTI_Line = EXTI_Line0 ;  // PA0 for User button AND IDD_WakeUP
+  EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+  EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising;
+  EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+  EXTI_Init(&EXTI_InitStructure);
+
+  /* Enable and set EXTI0 Interrupt to the lowest priority */
+  NVIC_InitStructure.NVIC_IRQChannel = EXTI0_IRQn ;
+  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0x0F;
+  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0x0F;
+  NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+  NVIC_Init(&NVIC_InitStructure);
+
+  /* Configure the LED_pin as output push-pull for LD3 & LD4 usage*/
+  GPIO_InitStructure.GPIO_Pin = LD_GREEN_GPIO_PIN | LD_BLUE_GPIO_PIN;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+  GPIO_Init(LD_GPIO_PORT, &GPIO_InitStructure);
+
+  /* Force a low level on LEDs*/
+  GPIO_LOW(LD_GPIO_PORT,LD_GREEN_GPIO_PIN);
+  GPIO_LOW(LD_GPIO_PORT,LD_BLUE_GPIO_PIN);
+
+/* Counter enable: GPIO set in output for enable the counter */
+  GPIO_InitStructure.GPIO_Pin = CTN_CNTEN_GPIO_PIN;
+  GPIO_Init( CTN_GPIO_PORT, &GPIO_InitStructure);
+
+/* To prepare to start counter */
+  GPIO_HIGH(CTN_GPIO_PORT,CTN_CNTEN_GPIO_PIN);
+
+/* Configure Port A LCD Output pins as alternate function */
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1 | GPIO_Pin_2 | GPIO_Pin_3 | GPIO_Pin_8 | GPIO_Pin_9 |GPIO_Pin_10 |GPIO_Pin_15;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+  GPIO_Init( GPIOA, &GPIO_InitStructure);
+
+/* Select LCD alternate function for Port A LCD Output pins */
+  GPIO_PinAFConfig(GPIOA, GPIO_PinSource1,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOA, GPIO_PinSource2,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOA, GPIO_PinSource3,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOA, GPIO_PinSource8,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOA, GPIO_PinSource9,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOA, GPIO_PinSource10,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOA, GPIO_PinSource15,GPIO_AF_LCD) ;
+
+  /* Configure Port B LCD Output pins as alternate function */
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3 | GPIO_Pin_4 | GPIO_Pin_5 | GPIO_Pin_8 | GPIO_Pin_9 \
+                                 | GPIO_Pin_10 | GPIO_Pin_11 | GPIO_Pin_12 | GPIO_Pin_13 | GPIO_Pin_14 | GPIO_Pin_15;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+  GPIO_Init( GPIOB, &GPIO_InitStructure);
+
+  /* Select LCD alternate function for Port B LCD Output pins */
+  GPIO_PinAFConfig(GPIOB, GPIO_PinSource3,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOB, GPIO_PinSource4,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOB, GPIO_PinSource5,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOB, GPIO_PinSource8,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOB, GPIO_PinSource9,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOB, GPIO_PinSource10,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOB, GPIO_PinSource11,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOB, GPIO_PinSource12,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOB, GPIO_PinSource13,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOB, GPIO_PinSource14,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOB, GPIO_PinSource15,GPIO_AF_LCD) ;
+
+  /* Configure Port C LCD Output pins as alternate function */
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1 | GPIO_Pin_2 | GPIO_Pin_3 | GPIO_Pin_6 \
+                                 | GPIO_Pin_7 | GPIO_Pin_8 | GPIO_Pin_9 | GPIO_Pin_10 |GPIO_Pin_11 ;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+  GPIO_Init( GPIOC, &GPIO_InitStructure);
+
+  /* Select LCD alternate function for Port B LCD Output pins */
+  GPIO_PinAFConfig(GPIOC, GPIO_PinSource0,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOC, GPIO_PinSource1,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOC, GPIO_PinSource2,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOC, GPIO_PinSource3,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOC, GPIO_PinSource6,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOC, GPIO_PinSource7,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOC, GPIO_PinSource8,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOC, GPIO_PinSource9,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOC, GPIO_PinSource10,GPIO_AF_LCD) ;
+  GPIO_PinAFConfig(GPIOC, GPIO_PinSource11,GPIO_AF_LCD) ;
+
+  /* Configure ADC (IDD_MEASURE) pin as Analogue */
+  GPIO_InitStructure.GPIO_Pin = IDD_MEASURE  ;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
+  GPIO_Init( IDD_MEASURE_PORT, &GPIO_InitStructure);
+}
+//--------------------------------------------------------------
+int main(void) {
+
+
+	GPIO_InitTypeDef GPIO_InitStructure;
+
+	  /* Enable the GPIOs clocks */
+	  RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA | RCC_AHBPeriph_GPIOB | RCC_AHBPeriph_GPIOC| RCC_AHBPeriph_GPIOD| RCC_AHBPeriph_GPIOE| RCC_AHBPeriph_GPIOH, ENABLE);
+
+	// запускаем тактирование GPIO порта F
+//	RCC_APB1PeriphClockCmd(RCC_AHBENR_GPIOBEN, ENABLE);
+
+	// Устанавливаем пины PF6, PF7, PF8, PF9 как выходные
+	// использовать будем PF6 и PF7, но уж проинициализируем все четыре LED
+//	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3 | GPIO_Pin_4 | GPIO_Pin_5;
+//	               // | GPIO_Pin_9;
+//	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+//	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+//	GPIO_Init(GPIOB, &GPIO_InitStructure);
+	  Init_GPIOs ();
+
+	xTaskCreate( vTaskLED1, ( signed char * ) "LED1", configMINIMAL_STACK_SIZE, NULL, 2,
+			( xTaskHandle * ) NULL);
+	xTaskCreate( vTaskLED2, ( signed char * ) "LED2", configMINIMAL_STACK_SIZE, NULL, 2,
+			( xTaskHandle * ) NULL);
 
 	/* Start the scheduler. */
 	vTaskStartScheduler();
 
-	/* Will only get here if there was not enough heap space to create the idle task. */
-	return 0;  
-}
-
-/*-----------------------------------------------------------*/
-
-void vMEMSTask(void *pvParameters)
-{
-	/* queue for MEMS data length */
-	uint8_t xBuffer_send[queueSIZE];
-
-	for(;;)
-	{
-		LIS302DL_Read(xBuffer_send, LIS302DL_OUT_X_ADDR, queueSIZE);
-		xQueueSendToBack(xQueue,xBuffer_send ,0);
-	    vTaskDelay(DELAY/portTICK_RATE_MS);
-	}
-}
-
-/*-----------------------------------------------------------*/
-
-void vBALANCETask(void *pvParameters)
-{
-	uint8_t temp1, temp2 = 0;
-	__IO uint8_t TempAcceleration = 0;
-	uint8_t xBuffer_receive[queueSIZE];
-	for( ;; )
-	{
-	 if(xQueueReceive(xQueue,xBuffer_receive,0)==pdPASS)
-		{
-		/* Disable All TIM4 Capture Compare Channels */
-		TIM_CCxCmd(TIM4, TIM_Channel_1, DISABLE);
-		TIM_CCxCmd(TIM4, TIM_Channel_2, DISABLE);
-		TIM_CCxCmd(TIM4, TIM_Channel_3, DISABLE);
-		TIM_CCxCmd(TIM4, TIM_Channel_4, DISABLE);
-
-		/* Update autoreload and capture compare registers value*/
-		temp1=((int8_t)(xBuffer_receive[0])<0)?(int8_t)(xBuffer_receive[0])*(-1):(int8_t)(xBuffer_receive[0]); //ABS
-		temp2=((int8_t)(xBuffer_receive[2])<0)?(int8_t)(xBuffer_receive[2])*(-1):(int8_t)(xBuffer_receive[2]); //ABS
-		TempAcceleration = (temp1<temp2)?temp2:temp1; //MAX(temp1,temp2)
-
-		if(TempAcceleration != 0)
-		{
-			if ((int8_t)xBuffer_receive[0] < -2)
-			{
-				/* Enable TIM4 Capture Compare Channel 4 */
-				TIM_CCxCmd(TIM4, TIM_Channel_4, ENABLE);
-				/* Sets the TIM4 Capture Compare4 Register value */
-				TIM_SetCompare4(TIM4, TIM_CCR/TempAcceleration);
-			}
-			if ((int8_t)xBuffer_receive[0] > 2)
-			{
-				/* Enable TIM4 Capture Compare Channel 2 */
-				TIM_CCxCmd(TIM4, TIM_Channel_2, ENABLE);
-				/* Sets the TIM4 Capture Compare2 Register value */
-				TIM_SetCompare2(TIM4, TIM_CCR/TempAcceleration);
-			}
-			if ((int8_t)xBuffer_receive[2] > 2)
-			{
-				/* Enable TIM4 Capture Compare Channel 1 */
-				TIM_CCxCmd(TIM4, TIM_Channel_1, ENABLE);
-				/* Sets the TIM4 Capture Compare1 Register value */
-				TIM_SetCompare1(TIM4, TIM_CCR/TempAcceleration);
-			}
-			if ((int8_t)xBuffer_receive[2] < -2)
-			{
-				/* Enable TIM4 Capture Compare Channel 3 */
-				TIM_CCxCmd(TIM4, TIM_Channel_3, ENABLE);
-				/* Sets the TIM4 Capture Compare3 Register value */
-				TIM_SetCompare3(TIM4, TIM_CCR/TempAcceleration);
-			}
-
-			/* Time base configuration */
-			TIM_SetAutoreload(TIM4,  TIM_ARR/TempAcceleration);
-		}
-	 }
-	taskYIELD(); 	//task is going to ready state to allow next one to run
-	}
-}
-
-/*-----------------------------------------------------------*/
-
-void vLEDTask( void *pvParameters )
-{
-    volatile int *LED;
-    LED = (int *) pvParameters;
-
-	for( ;; )
-	{
-		STM_EVAL_LEDToggle((Led_TypeDef)LED[0]);
-	    vTaskDelay(LED[1]/portTICK_RATE_MS);
-	}
-}
-
-/*-----------------------------------------------------------*/
-
-void vSWITCHTask( void *pvParameters )
-{
-	static int i=0;
-	for( ;; )
-	{
-		if(xSemaphoreTake(xSemaphoreSW,( portTickType ) 0) == pdTRUE)
-		{
-			i^=1;		//just switch the state if semaphore was given
-
-			if(i==0)	//LED3..LD6 tasks ready, BALANCE, MEMS suspended
-			{
-				vTaskSuspend(xBALANCE_Task);
-				TIM_Cmd(TIM4, DISABLE);
-				vTaskSuspend(xMEMS_Task);
-				prvLED_Config(GPIO);
-				vTaskResume(xLED_Tasks[0]);
-				vTaskResume(xLED_Tasks[1]);
-				vTaskResume(xLED_Tasks[2]);
-				vTaskResume(xLED_Tasks[3]);
-			}
-			else		//MEMS and BALANCE ready, LED tasks suspended
-			{
-				vTaskSuspend(xLED_Tasks[0]);
-				vTaskSuspend(xLED_Tasks[1]);
-				vTaskSuspend(xLED_Tasks[2]);
-				vTaskSuspend(xLED_Tasks[3]);
-				prvLED_Config(TIMER);
-				TIM_Cmd(TIM4, ENABLE);
-				vTaskResume(xBALANCE_Task);
-				vTaskResume(xMEMS_Task);
-			}
-		}
-		taskYIELD(); 	//task is going to ready state to allow next one to run
-	}
-}
-
-/*-----------------------------------------------------------*/
-
-void vApplicationIdleHook( void )
-{
-volatile size_t xFreeStackSpace;
-
-	/* This function is called on each cycle of the idle task.  In this case it
-	does nothing useful, other than report the amout of FreeRTOS heap that 
-	remains unallocated. */
-	xFreeStackSpace = xPortGetFreeHeapSize();
-
-	if( xFreeStackSpace > 100 )
-	{
-		/* By now, the kernel has allocated everything it is going to, so
-		if there is a lot of heap remaining unallocated then
-		the value of configTOTAL_HEAP_SIZE in FreeRTOSConfig.h can be
-		reduced accordingly. */
-	}
-}
-
-/*-----------------------------------------------------------*/
-
-void vApplicationMallocFailedHook( void )
-{
-	/* Called if a call to pvPortMalloc() fails because there is insufficient
-	free memory available in the FreeRTOS heap.  pvPortMalloc() is called
-	internally by FreeRTOS API functions that create tasks, queues, software 
-	timers, and semaphores.  The size of the FreeRTOS heap is set by the
-	configTOTAL_HEAP_SIZE configuration constant in FreeRTOSConfig.h. */
-	for( ;; );
+	/* Will only get here if there was insufficient memory to create the idle
+	 task.  The idle task is created within vTaskStartScheduler(). */
+	for (;;)
+		;
 }
 /*-----------------------------------------------------------*/
 
-void vApplicationStackOverflowHook( xTaskHandle *pxTask, signed char *pcTaskName )
-{
-	( void ) pcTaskName;
-	( void ) pxTask;
+void vApplicationTickHook(void) {
 
-	/* Run time stack overflow checking is performed if
-	configconfigCHECK_FOR_STACK_OVERFLOW is defined to 1 or 2.  This hook
-	function is called if a stack overflow is detected. */
-	for( ;; );
+//	TimingDelay_Decrement();
 }
 /*-----------------------------------------------------------*/
-
-#ifdef  USE_FULL_ASSERT
-
-/**
-  * @brief  Reports the name of the source file and the source line number
-  *   where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
-void assert_failed(uint8_t* file, uint32_t line)
-{ 
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-
-  /* Infinite loop */
-  while (1)
-  {
-  }
-}
-#endif
-
-/**
-  * @}
-  */
-
-
-/******************* (C) COPYRIGHT 2011 STMicroelectronics *****END OF FILE****/

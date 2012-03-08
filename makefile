@@ -82,7 +82,7 @@
 	USE_LTO		= NO
 
 # compile options 
-#	MCU			= cortex-m3
+	MCU			= cortex-m3
 # Select family 
 # STM32F10X_LD    : STM32 Low density devices
 # STM32F10X_LD_VL : STM32 Low density Value Line devices
@@ -92,10 +92,10 @@
 # STM32F10X_HD_VL : STM32 XL-density devices
 # STM32F10X_CL    : STM32 Connectivity line devices
 # STM32F10X_XL    : STM32 XL-density devices
-#	CHIP		= STM32F10X_MD
-
-	MCU 	= cortex-m4
-	CHIP	= STM32F407VG
+	#CHIP		= STM32L1XX_MD
+	CHIP		= STM32L15XX8_64K
+#	MCU 	= cortex-m4
+#	CHIP	= STM32F407VG
 
 #STARTUP = startup_stm32f10x_md.S
 STARTUP = startup_$(CHIP).S
@@ -144,15 +144,15 @@ STARTUP = startup_$(CHIP).S
 	OK		= $(EXEDIR)/$(TARGET).ok
 
 # linker script (chip dependent)
-	LD_SCRIPT	= $(SRCDIR)/$(CHIP).ld
-
+	#LD_SCRIPT	= $(SRCDIR)/$(CHIP).ld
+	LD_SCRIPT	= $(SRCDIR)/stm32_flash.ld
 # scmRTOS dir
-	SCMDIR		= ../scmRTOS
-	COMMON		= ../SamplesCommon
+	#SCMDIR		= ../scmRTOS
+	#COMMON		= ../SamplesCommon
  
 # source directories (all *.c, *.cpp and *.s files included)
 	DIRS	:= $(SRCDIR)
-	DIRS	+= $(COMMON)
+	#DIRS	+= $(COMMON)
 	DIRS	+= $(RTOS_ROOT)/Source
 	DIRS	+= $(RTOS_ROOT)/Source/portable/GCC/ARM_CM3
 	DIRS	+= $(RTOS_ROOT)/Source/include
@@ -165,14 +165,12 @@ STARTUP = startup_$(CHIP).S
 	#STM32F1_DISCOVERY_DRIVER_DIR=../MyARMLib/STM32/STM32F4_discovery
 	DIRS	+= $(CMSIS_DRIVER_DIR)
 	DIRS	+= ../MyARMLib/CMSIS/include
-#	DIRS	+= ../MyARMLib/STM32/STM32F10x/include
-#	DIRS	+= ../MyARMLib/STM32/STM32F10x_StdPeriph_Driver/inc
-#	DIRS	+= ../MyARMLib/STM32/STM32F10x_StdPeriph_Driver/src
-	DIRS	+= ../MyARMLib/STM32/STM32F4xx/include
-	DIRS	+= ../MyARMLib/STM32/STM32F4_discovery
-	DIRS	+= ../MyARMLib/STM32/STM32F4xx_StdPeriph_Driver/src
-	DIRS	+= ../MyARMLib/STM32/STM32F4xx_StdPeriph_Driver/inc
-
+	DIRS	+= ../MyARMLib/STM32/STM32L1xx/include
+	DIRS	+= ../MyARMLib/STM32/STM32L1_discovery
+	DIRS	+= ../MyARMLib/STM32/STM32L1xx_StdPeriph_Driver/src
+	DIRS	+= ../MyARMLib/STM32/STM32L1xx_StdPeriph_Driver/inc
+	DIRS	+= ../MyARMLib/STM32/STM32_TouchSensing_Driver/src
+	DIRS	+= ../MyARMLib/STM32/STM32_TouchSensing_Driver/inc
 
 #	DIRS	+= ../MyARMLib/FreeRTOS
 
@@ -191,15 +189,6 @@ STARTUP = startup_$(CHIP).S
 	#OBJS	+= $(RTOS_ROOT)/Source/tasks.c
 	#/port.c
 
-#	OBJS	+= ../MyARMLib/STM32/STM32F10x_StdPeriph_Driver/src/stm32f10x_gpio.c 
-#	OBJS	+= ../MyARMLib/STM32/STM32F10x_StdPeriph_Driver/src/stm32f10x_rcc.c 
-#	OBJS	+= $(RTOS_ROOT)/Source/tasks.c
-#	OBJS	+= $(RTOS_ROOT)/Source/list.c 
-#	OBJS	+= $(RTOS_ROOT)/Source/timers.c 
-#	OBJS	+= $(RTOS_ROOT)/Source/queue.c 
-#	OBJS	+= $(RTOS_ROOT)/Source/tasks.c 
-#	OBJS	+= $(RTOS_ROOT)/Source/portable/GCC/ARM_CM3/port.c 
-#	OBJS	+= $(RTOS_ROOT)/Source/portable/MemMang/heap_2.c	
 	OBJS	:= $(notdir $(OBJS))
 	OBJS	:= $(OBJS:.cpp=.o)
 	OBJS	:= $(OBJS:.c=.o)

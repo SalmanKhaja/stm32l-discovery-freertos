@@ -3,8 +3,8 @@
 **
 **  File        : stm32_flash.ld
 **
-**  Abstract    : Linker script for STM32F407VG Device with
-**                1024KByte FLASH, 128KByte RAM
+**  Abstract    : Linker script for STM32L152RB Device with
+**                128KByte FLASH, 16KByte RAM
 **
 **                Set heap size, stack size and stack location according
 **                to application requirements.
@@ -15,7 +15,7 @@
 **
 **  Environment : Atollic TrueSTUDIO(R)
 **
-**  Distribution: The file is distributed “as is,” without any warranty
+**  Distribution: The file is distributed Â“as is,Â” without any warranty
 **                of any kind.
 **
 **  (c)Copyright Atollic AB.
@@ -33,18 +33,19 @@
 ENTRY(Reset_Handler)
 
 /* Highest address of the user mode stack */
-_estack = 0x20020000;    /* end of 128K RAM */
+_estack = 0x20004000;    /* end of 16K RAM */
 
 /* Generate a link error if heap and stack don't fit into RAM */
 _Min_Heap_Size = 0;      /* required amount of heap  */
-_Min_Stack_Size = 0x400; /* required amount of stack */
+_Min_Stack_Size = 0x80; /* required amount of stack */
 
 /* Specify the memory areas */
 MEMORY
 {
-  FLASH (rx)      : ORIGIN = 0x08000000, LENGTH = 1024K
-  RAM (xrw)       : ORIGIN = 0x20000000, LENGTH = 128K
+  FLASH (rx)      : ORIGIN = 0x08000000, LENGTH = 128K
+  RAM (xrw)       : ORIGIN = 0x20000000, LENGTH = 16K
   MEMORY_B1 (rx)  : ORIGIN = 0x60000000, LENGTH = 0K
+  RW_EEPROM (rw)   : ORIGIN = 0x08080000, LENGTH = 32
 }
 
 /* Define output sections */
@@ -68,7 +69,7 @@ SECTIONS
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
     *(.glue_7)         /* glue arm to thumb code */
     *(.glue_7t)        /* glue thumb to arm code */
-    *(.eh_frame)
+	*(.eh_frame)
 
     KEEP (*(.init))
     KEEP (*(.fini))
@@ -110,7 +111,7 @@ SECTIONS
   _sidata = .;
 
   /* Initialized data sections goes into RAM, load LMA copy after code */
-  .data : 
+  .data : AT ( _sidata )
   {
     . = ALIGN(4);
     _sdata = .;        /* create a global symbol at data start */
@@ -119,7 +120,7 @@ SECTIONS
 
     . = ALIGN(4);
     _edata = .;        /* define a global symbol at data end */
-  } >RAM AT> FLASH
+  } >RAM
 
   /* Uninitialized data section */
   . = ALIGN(4);
@@ -167,4 +168,6 @@ SECTIONS
   }
 
   .ARM.attributes 0 : { *(.ARM.attributes) }
+  
+  .DataFlash (NOLOAD): {*(.DataFlash)} >RW_EEPROM
 }
