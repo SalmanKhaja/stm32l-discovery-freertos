@@ -357,6 +357,7 @@ clean:
 	-@$(RM) $(LSTDIR)/*.lst 2>/dev/null
 	-@$(RM) $(ELF)
 	-@$(RM) $(HEX)
+	-@$(RM) $(BIN)
 	-@$(RM) $(LSS)
 	-@$(RM) $(MAP)
 
