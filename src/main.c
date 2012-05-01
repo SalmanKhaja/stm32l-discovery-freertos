@@ -50,9 +50,9 @@ void Delay(__IO uint32_t nTime);
 void vTaskLED1(void *pvParameters) {
 
         for (;;) {
-                GPIO_SetBits(GPIOB, GPIO_Pin_3);
+                GPIO_SetBits(GPIOB, LD_GREEN_GPIO_PIN);
                 vTaskDelay(500);
-                GPIO_ResetBits(GPIOB, GPIO_Pin_3);
+                GPIO_ResetBits(GPIOB, LD_GREEN_GPIO_PIN);
                 vTaskDelay(500);
         }
 
@@ -61,9 +61,9 @@ void vTaskLED1(void *pvParameters) {
 void vTaskLED2(void *pvParameters) {
 
         for (;;) {
-                GPIO_SetBits(GPIOB, GPIO_Pin_4);
+                GPIO_SetBits(GPIOB, LD_BLUE_GPIO_PIN);
                 vTaskDelay(321);
-                GPIO_ResetBits(GPIOB, GPIO_Pin_4);
+                GPIO_ResetBits(GPIOB, LD_BLUE_GPIO_PIN);
                 vTaskDelay(321);
         }
 

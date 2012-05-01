@@ -5,12 +5,11 @@
  * @version   V1.0.0
  * @date      31-December-2010
  * @brief     STM32L1xx Ultra Low Power Medium-density Devices vector table for 
- *            Atollic toolchain.
+ *            RIDE7 toolchain.
  *            This module performs:
  *                - Set the initial SP
  *                - Set the initial PC == Reset_Handler,
  *                - Set the vector table entries with the exceptions ISR address
- *                - Configure the clock system
  *                - Branches to main in the C library (which eventually
  *                  calls main()).
  *            After Reset the Cortex-M3 processor is in Thread mode,
@@ -59,7 +58,7 @@ defined in linker script */
  * @retval : None
 */
 
-  .section .text.Reset_Handler
+    .section .text.Reset_Handler
   .weak Reset_Handler
   .type Reset_Handler, %function
 Reset_Handler:
@@ -91,11 +90,8 @@ LoopFillZerobss:
   ldr r3, = _ebss
   cmp r2, r3
   bcc FillZerobss
-
 /* Call the clock system intitialization function.*/
-    bl  SystemInit
-/* Call static constructors */
-    bl __libc_init_array
+  bl  SystemInit
 /* Call the application's entry point.*/
   bl main
   bx lr
@@ -107,21 +103,20 @@ LoopFillZerobss:
  *         the system state for examination by a debugger.
  *
  * @param  None
- * @retval : None
+ * @retval None
 */
     .section .text.Default_Handler,"ax",%progbits
 Default_Handler:
 Infinite_Loop:
   b Infinite_Loop
   .size Default_Handler, .-Default_Handler
-/******************************************************************************
+/*******************************************************************************
 *
-* The minimal vector table for a Cortex M3.  Note that the proper constructs
+* The minimal vector table for a Cortex M3. Note that the proper constructs
 * must be placed on this to ensure that it ends up at physical address
 * 0x0000.0000.
-*
-******************************************************************************/
-   .section .isr_vector,"a",%progbits
+*******************************************************************************/
+  .section .isr_vector,"a",%progbits
   .type g_pfnVectors, %object
   .size g_pfnVectors, .-g_pfnVectors
 
@@ -167,7 +162,7 @@ g_pfnVectors:
   .word DAC_IRQHandler
   .word COMP_IRQHandler
   .word EXTI9_5_IRQHandler
-  .word LCD_IRQHandler  
+  .word LCD_IRQHandler
   .word TIM9_IRQHandler
   .word TIM10_IRQHandler
   .word TIM11_IRQHandler
@@ -304,7 +299,7 @@ g_pfnVectors:
   .thumb_set EXTI9_5_IRQHandler,Default_Handler
 
   .weak LCD_IRQHandler
-  .thumb_set LCD_IRQHandler,Default_Handler  
+  .thumb_set LCD_IRQHandler,Default_Handler
 
   .weak TIM9_IRQHandler
   .thumb_set TIM9_IRQHandler,Default_Handler
@@ -366,5 +361,5 @@ g_pfnVectors:
   .weak TIM7_IRQHandler
   .thumb_set TIM7_IRQHandler,Default_Handler
 
-/******************* (C) COPYRIGHT 2010 STMicroelectronics *****END OF FILE****/
+/******************** (C) COPYRIGHT 2010 STMicroelectronics *****END OF FILE***/
 
