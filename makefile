@@ -78,15 +78,17 @@
 	TOOL	= arm-none-eabi-
 #	TOOL	= arm-kgp-eabi-
 
-	OPTIMIZE	= -O2
+	OPTIMIZE	= -O0
 	USE_LTO		= NO
-
+	DEBUG       = -g3 -ggdb
+	
 # compile options 
 	MCU			= cortex-m3
+	
 # Select family 
 # STM32F10X_LD    : STM32 Low density devices
 # STM32F10X_LD_VL : STM32 Low density Value Line devices
-# CHIP		= STM32F10X_MD    #: STM32 Medium density devices
+# STM32F10X_MD    : STM32 Medium density devices
 # STM32F10X_MD_VL : STM32 Medium density Value Line devices
 # STM32F10X_HD    : STM32 High density devices
 # STM32F10X_HD_VL : STM32 XL-density devices
@@ -98,7 +100,7 @@
 #	CHIP	= STM32F407VG
 
 #STARTUP = startup_stm32f10x_md.S
-STARTUP = startup_$(CHIP).S
+STARTUP = startup_$(CHIP)
 
 	RTOS_ROOT=../FreeRTOS
 	CMSIS_DRIVER_DIR=../MyARMLib/CMSIS/include
@@ -144,8 +146,8 @@ STARTUP = startup_$(CHIP).S
 	OK		= $(EXEDIR)/$(TARGET).ok
 
 # linker script (chip dependent)
-	#LD_SCRIPT	= $(SRCDIR)/$(CHIP).ld
-	LD_SCRIPT	= $(SRCDIR)/stm32_flash.ld
+	LD_SCRIPT	= $(SRCDIR)/$(CHIP).ld
+#	LD_SCRIPT	= $(SRCDIR)/stm32_flash.ld
 # scmRTOS dir
 	#SCMDIR		= ../scmRTOS
 	#COMMON		= ../SamplesCommon
@@ -171,7 +173,6 @@ STARTUP = startup_$(CHIP).S
 	DIRS	+= ../MyARMLib/STM32/STM32L1xx_StdPeriph_Driver/inc
 	DIRS	+= ../MyARMLib/STM32/STM32_TouchSensing_Driver/src
 	DIRS	+= ../MyARMLib/STM32/STM32_TouchSensing_Driver/inc
-
 #	DIRS	+= ../MyARMLib/FreeRTOS
 
 # includes
@@ -205,7 +206,7 @@ STARTUP = startup_$(CHIP).S
 		$(BASE)/.project
 
 # flags
-	FLAGS	= -mcpu=$(MCU) -mthumb
+	FLAGS	= -mcpu=$(MCU) -mthumb -ggdb
 	FLAGS	+= $(INCS)
 	FLAGS	+= -MD 
 	#-DGCC_ARMCM3
@@ -218,7 +219,7 @@ STARTUP = startup_$(CHIP).S
 	CFLAGS	+= $(OPTIMIZE)
 	CFLAGS	+= -std=gnu99
 	CFLAGS	+= -D GCC_ARMCM3
-	CFLAGS	+= -g
+	CFLAGS	+= $(DEBUG)
 	CFLAGS	+= -ffunction-sections -fdata-sections
 #	CFLAGS	+= -Wall -Wextra
 #	CFLAGS	+= -Wimplicit -Wcast-align -Wpointer-arith -Wredundant-decls
@@ -333,6 +334,9 @@ $(OBJDIR)/%.o: %.S makefile
 	@echo --- assembling $<...
 	$(AS) -c $(AFLAGS) -o $@ $<
 
+$(OBJDIR)/%.o: %.s makefile
+	@echo --- assembling $<...
+	$(AS) -c $(AFLAGS) -o $@ $<
 dirs: $(OBJDIR) $(EXEDIR) $(LSTDIR) $(BAKDIR)
 
 $(OBJDIR):
